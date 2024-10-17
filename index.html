@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Generate Excel in Browser</title>
+    <!-- <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script> -->
+    <script src="./exceljs.min.js"></script>
+    <style>
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+      }
+      th,
+      td {
+        border: 1px solid black;
+        padding: 8px;
+        text-align: left;
+      }
+      .actions {
+        text-align: center;
+      }
+      .table-container {
+        margin-bottom: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="table-wrapper">
+      <!-- Initial tables will be added here -->
+    </div>
+    <button id="addTableBtn">增加新的表格</button>
+    <button id="getAllDataBtn">获取数据</button>
+    <button id="saveAllDataBtn">保存数据</button>
+    <button id="generateExcel" style="margin-top: 100px">生成EXCEL</button>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        const tableWrapper = document.getElementById("table-wrapper");
+        const addTableBtn = document.getElementById("addTableBtn");
+        const saveAllDataBtn = document.getElementById("saveAllDataBtn");
+        const getAllDataBtn = document.getElementById("getAllDataBtn");
+
+        let tableCount = 0;
+        // Function to load tables from localStorage
+        function loadTablesFromStorage() {
+          const savedTables = JSON.parse(localStorage.getItem("tables")) || [];
+          savedTables.forEach((tableData) => createNewTableFromData(tableData));
+        }
+
+        // Function to create a new table from saved data
+        function createNewTableFromData({ date, timePeriods }) {
+          tableCount++;
+          const newTableContainer = document.createElement("div");
+          newTableContainer.className = "table-container";
+
+          const newTable = document.createElement("table");
+          newTable.id = `myTable${tableCount}`;
+
+          const thead = document.createElement("thead");
+          const headerRow = document.createElement("tr");
+          headerRow.innerHTML = `
+                    <th>开始时间</th>
+                    <th>结束时间</th>
+                    <th class="actions">功能</th>
+                `;
+          thead.appendChild(headerRow);
+          newTable.appendChild(thead);
+
+          const tbody = document.createElement("tbody");
+          timePeriods.forEach((row) => {
+            const newRow = tbody.insertRow();
+            newRow.insertCell(
+              0
+            ).innerHTML = `<input type="time" value="${row[0]}">`;
+            newRow.insertCell(
+              1
+            ).innerHTML = `<input type="time" value="${row[1]}">`;
+            const actionsCell = newRow.insertCell(2);
+            actionsCell.className = "actions";
+            const deleteBtn = document.createElement("button");
+            deleteBtn.innerHTML = "删除";
+            deleteBtn.onclick = function () {
+              deleteRowAndUpdateStorage(newRow, newTable.id);
+            };
+            actionsCell.appendChild(deleteBtn);
+          });
+          newTable.appendChild(tbody);
+
+          const addRowBtn = document.createElement("button");
+          addRowBtn.innerHTML = "Add Row";
+          addRowBtn.onclick = function () {
+            addRowAndUpdateStorage(newTable.id);
+          };
+
+          newTableContainer.appendChild(addRowBtn);
+
+          // 创建一个新的 input 元素
+          const dateInput = document.createElement("input");
+          dateInput.style.marginLeft = "50px";
+          // 设置 input 元素的 type 属性为 'time'
+          dateInput.type = "date";
+          // 设置 input 元素的 value 属性为当前日期
+          dateInput.value = date;
+          // 将 input 元素添加到表格容器中
+          dateInput.className = "workDay";
+          newTableContainer.appendChild(dateInput);
+          newTableContainer.appendChild(newTable);
+
+          tableWrapper.appendChild(newTableContainer);
+        }
+
+        // Function to add a new row to the current table and update localStorage
+        function addRowAndUpdateStorage(tableId) {
+          addRowToTable(tableId);
+          updateStorage();
+        }
+
+        // Function to delete a row from the current table and update localStorage
+        function deleteRowAndUpdateStorage(row, tableId) {
+          const table = document
+            .getElementById(tableId)
+            .getElementsByTagName("tbody")[0];
+          table.deleteRow(row.rowIndex - 1); // Adjust rowIndex because the row has already been added
+          updateStorage();
+        }
+
+        // Function to update localStorage with the current state of all tables
+        function updateStorage() {
+          const tablesData = [];
+          const tableContainers =
+            tableWrapper.getElementsByClassName("table-container");
+          for (let i = 0; i < tableContainers.length; i++) {
+            const table = tableContainers[i].querySelector("table tbody");
+            const workDay = tableContainers[i].querySelector(".workDay");
+            console.log("workDay", workDay.value);
+            const rowsData = [];
+            for (let j = 0; j < table.rows.length; j++) {
+              const cells = table.rows[j].cells;
+              rowsData.push([
+                cells[0].querySelector("input").value,
+                cells[1].querySelector("input").value,
+              ]);
+            }
+            tablesData.push({ date: workDay.value, timePeriods: rowsData });
+          }
+          localStorage.setItem("tables", JSON.stringify(tablesData));
+          return tablesData;
+        }
+        saveAllDataBtn.onclick = updateStorage;
+
+        getAllDataBtn.onclick = function () {
+          const allData = updateStorage();
+          console.log(allData);
+        };
+        // Function to add a new row to the current table
+        function addRowToTable(tableId) {
+          const table = document
+            .getElementById(tableId)
+            .getElementsByTagName("tbody")[0];
+          const newRow = table.insertRow();
+
+          const cell1 = newRow.insertCell(0);
+          const cell2 = newRow.insertCell(1);
+          cell1.innerHTML = '<input type="time" value="">';
+          cell2.innerHTML = '<input type="time" value="">';
+
+          const actionsCell = newRow.insertCell(2);
+          actionsCell.className = "actions";
+          const deleteBtn = document.createElement("button");
+          deleteBtn.innerHTML = "删除";
+          deleteBtn.onclick = function () {
+            table.deleteRow(newRow.rowIndex - 1); // Adjust rowIndex because the row has already been added
+          };
+          actionsCell.appendChild(deleteBtn);
+        }
+
+        // Attach the createNewTable function to the Add New Table button
+        addTableBtn.onclick = () =>
+          createNewTableFromData({ date: "", timePeriods: [] });
+
+        // Load tables from localStorage on page load
+        loadTablesFromStorage();
+
+        // 添加一个事件监听器，当点击生成Excel按钮时执行以下代码
+        document
+          .getElementById("generateExcel")
+          .addEventListener("click", function () {
+            const data = updateStorage();
+            function formatData(data) {
+              const title = [
+                "序号",
+                "设备名称",
+                "日期",
+                "开始时间",
+                "结束时间",
+                "小时数",
+                "分钟数",
+                "单价",
+                "合价",
+                "空白格",
+                //遍历工作表中的所有行（包括空行）的时候处理将空白格标题去除
+              ];
+              const list = data.map((item) => {
+                const workDays = item.timePeriods.map((timePeriod) => {
+                  const startTimeStr = `1970-01-01T${timePeriod[0]}:00Z`; // 添加了秒和时区信息
+                  const endTimeStr = `1970-01-01T${timePeriod[1]}:00Z`;
+                  const startTime = new Date(startTimeStr);
+                  const endTime = new Date(endTimeStr);
+
+                  const durationMilliseconds = endTime - startTime;
+                  const durationMinutes = durationMilliseconds / 60000;
+                  // 计算小时数并保留两位小数
+                  const hours = Math.floor(durationMinutes / 60).toFixed(2);
+
+                  // 计算剩余的分钟数并保留两位小数
+                  const minutes = Math.floor(durationMinutes % 60).toFixed(2);
+
+                  const totalPay = durationMinutes * (270 / 60).toFixed(2); // 每分钟薪资
+
+                  console.log(hours, minutes, totalPay); // 输出总薪资
+
+                  return {
+                    date: item.date,
+                    timePeriods: [
+                      {
+                        startTime: timePeriod[0],
+                        endTime: timePeriod[1],
+                        hourlyRate: 270,
+                        hours,
+                        minutes,
+                        totalPay: totalPay.toFixed(2),
+                      },
+                    ],
+                  };
+                });
+                return {
+                  employeeID: "E001",
+                  workDays: workDays,
+                };
+              });
+              return {
+                title: title,
+                list: list,
+              };
+            }
+            const jsonData = formatData(data);
+            console.log(jsonData);
+
+            // const jsonData = {
+            //   title: [
+            //     "员工ID",
+            //     "工作日期",
+            //     "开始时间",
+            //     "结束时间",
+            //     "时薪",
+            //     "总薪资",
+            //   ],
+            //   list: [
+            //     {
+            //       employeeID: "E001",
+            //       workDays: [
+            //         {
+            //           date: "2023-10-09",
+            //           timePeriods: [
+            //             {
+            //               startTime: "09:00:00",
+            //               endTime: "12:00:00",
+            //               hourlyRate: 270,
+            //               totalPay: 0, // (12:00 - 09:00) * 60分钟 * 270元/小时 / 60 = 270 * 3 = 810元（此处为示例计算，实际应编写脚本处理）
+            //             },
+            //             {
+            //               startTime: "13:30:00",
+            //               endTime: "17:30:00",
+            //               hourlyRate: 270,
+            //               totalPay: 0, // 同上计算为 270 * 4 = 1080元
+            //             },
+            //           ],
+            //         },
+            //         {
+            //           date: "2023-10-10",
+            //           timePeriods: [
+            //             {
+            //               startTime: "08:30:00",
+            //               endTime: "12:00:00",
+            //               hourlyRate: 270,
+            //               totalPay: 0, // (12:00 - 08:30) * 60分钟 * 270元/小时 / 60 = 270 * 3.5 = 945元
+            //             },
+            //             {
+            //               startTime: "14:00:00",
+            //               endTime: "17:45:00",
+            //               hourlyRate: 270,
+            //               totalPay: 0, // (17:45 - 14:00) * 60分钟 * 270元/小时 / 60，注意这里要转换为小时或分钟来计算，结果为 270 * 3.75 = 1012.5元，但可能需要四舍五入或取整
+            //             },
+            //           ],
+            //         },
+            //       ],
+            //     },
+            //     // 可以继续添加更多的员工数据
+            //   ],
+            // };
+
+            // 创建一个新的工作簿
+            const workbook = new ExcelJS.Workbook();
+            const worksheet = workbook.addWorksheet("Sheet1");
+
+            // 定义标题行
+            const titleRow = jsonData.title.map((title) => ({
+              header: title,
+              key: title,
+            }));
+            // 添加标题到工作表
+            titleRow.forEach((col, index) => {
+              worksheet.columns = [
+                ...(worksheet.columns || []),
+                {
+                  header: col.header,
+                  key: col.key,
+                  width: 20,
+                  style: {
+                    alignment: {
+                      horizontal: "center",
+                      vertical: "middle",
+                    },
+                  },
+                },
+              ];
+            });
+            // 处理数据行
+            console.log(jsonData);
+            jsonData.list.forEach((employee, index) => {
+              employee.workDays.forEach((workDay) => {
+                workDay.timePeriods.forEach((timePeriod) => {
+                  // 添加数据行到工作表
+                  const row = {
+                    序号: index + 1,
+                    设备名称: employee.employeeID,
+                    日期: workDay.date,
+                    开始时间: timePeriod.startTime,
+                    结束时间: timePeriod.endTime,
+                    小时数: timePeriod.hours,
+                    分钟数: timePeriod.minutes,
+                    单价: timePeriod.hourlyRate,
+                    合价: timePeriod.totalPay,
+                    空白格: "",
+                  };
+                  console.log(JSON.stringify(row, null, 2));
+                  worksheet.addRow(row);
+                });
+                // worksheet.lastRow.style = {
+                //   border: {
+                //     top: { style: "thin" },
+                //     left: { style: "thin" },
+                //     bottom: { style: "thin" },
+                //     right: { style: "thin" },
+                //   },
+                // };
+              });
+            });
+            console.log(worksheet);
+
+            // 遍历工作表中的所有行（包括空行）
+            worksheet.eachRow(
+              { includeEmpty: true },
+              function (row, rowNumber) {
+                // 遍历一行中的所有单元格（包括空单元格）
+                row.eachCell(
+                  { includeEmpty: true },
+                  function (cell, colNumber) {
+                    cell.style.border = {
+                      top: { style: "thin" },
+                      left: { style: "thin" },
+                      bottom: { style: "thin" },
+                      right: { style: "thin" },
+                    };
+                  }
+                );
+              }
+            );
+            worksheet.getCell("J1").value = "";
+            // function generateLetters(count) {
+            //   let letters = [];
+            //   for (let i = 0; i < count; i++) {
+            //     // 使用 String.fromCharCode 将 ASCII 码转换为字符
+            //     // 'A' 的 ASCII 码是 65
+            //     let letter = String.fromCharCode(65 + i);
+            //     letters.push(letter);
+            //   }
+            //   return letters; // 直接返回数组，而不是转换为字符串
+            // }
+            function formatWorksheet(worksheet, jsonData) {
+              const startRow = 2; // 从第2行开始添加数据
+              const rowsCount = worksheet.rowCount;
+
+              // F 列数据对G数据有依赖 所以先遍历 G 然后遍历 F
+              const mergeCellsColRange = [
+                "A",
+                "B",
+                "C",
+                "G",
+                "F",
+                "H",
+                "I",
+                "J",
+              ];
+
+              console.log(rowsCount, jsonData);
+              jsonData.list.reduce((startRow, employee) => {
+                const firstRow = startRow;
+                const lastRow = startRow + employee.workDays.length - 1;
+                const mergeCellsRowRange = [startRow, lastRow];
+                // 生成从 startRow 到 lastRow 的数字数组
+                const rowRangeArray = Array.from(
+                  { length: lastRow - startRow + 1 },
+                  (_, i) => i + startRow
+                );
+                for (let col of mergeCellsColRange) {
+                  console.log(
+                    col +
+                      mergeCellsRowRange[0] +
+                      ":" +
+                      col +
+                      mergeCellsRowRange[1]
+                  );
+
+                  // 针对特定的区域进行简单求和计算
+                  if (["I"].includes(col)) {
+                    // for (let row of rowRangeArray) {
+                    //   console.log(worksheet.getCell(col + row).value);
+                    // }
+
+                    const sum = rowRangeArray.reduce((sum, row) => {
+                      console.log("value", worksheet.getCell(col + row).value);
+                      return sum + Number(worksheet.getCell(col + row).value);
+                    }, 0);
+                    console.log("sum", sum);
+                    worksheet.getCell(col + mergeCellsRowRange[0]).value =
+                      sum.toFixed(2);
+                  }
+                  // 针对特定的区域进行复杂简单求和计算 (例如：小时数和分钟数的求和) F满60 E+1
+                  if (["G", "F"].includes(col)) {
+                    let hours = 0;
+                    let minutes = 0;
+                    const sum = rowRangeArray.reduce((sum, row) => {
+                      console.log("value", worksheet.getCell(col + row).value);
+                      return sum + Number(worksheet.getCell(col + row).value);
+                    }, 0);
+
+                    if (col === "G") {
+                      // 计算小时数并保留两位小数
+                      hours = Math.floor(sum / 60).toFixed(2);
+
+                      // 计算剩余的分钟数并保留两位小数
+                      minutes = Math.floor(sum % 60).toFixed(2);
+                      worksheet.getCell(col + mergeCellsRowRange[0]).value =
+                        minutes;
+                      console.log("minutes", minutes);
+                    }
+                    if (col === "F") {
+                      worksheet.getCell(col + mergeCellsRowRange[0]).value = (
+                        sum + hours
+                      ).toFixed(2);
+                      console.log("hours", (sum + hours).toFixed(2));
+                    }
+                  }
+
+                  // 合并一系列单元格
+                  worksheet.mergeCells(
+                    col +
+                      mergeCellsRowRange[0] +
+                      ":" +
+                      col +
+                      mergeCellsRowRange[1]
+                  );
+                }
+
+                console.log(mergeCellsRowRange, employee.workDays);
+                return startRow + employee.workDays.length;
+              }, startRow);
+              // 合并标题单元格
+              worksheet.getCell("D1").value = "起止时间";
+              worksheet.getCell("F1").value = "合计";
+              worksheet.mergeCells("D1:E1");
+              worksheet.mergeCells("F1:G1");
+            }
+            formatWorksheet(worksheet, jsonData);
+            // 生成Excel文件的二进制数据;
+            workbook.xlsx
+              .writeBuffer()
+              .then(function (data) {
+                // 创建一个Blob对象
+                var blob = new Blob([data], {
+                  type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                });
+
+                // 创建一个指向Blob对象的URL
+                var url = URL.createObjectURL(blob);
+
+                // 创建一个隐藏的<a>元素
+                var a = document.createElement("a");
+                a.style.display = "none";
+                a.href = url;
+
+                // 设置下载的文件名
+                a.download = "example.xlsx";
+
+                // 将<a>元素添加到文档中（虽然它是隐藏的，但这一步是必要的）
+                document.body.appendChild(a);
+
+                // 触发点击事件以下载文件
+                a.click();
+
+                // 释放URL对象
+                URL.revokeObjectURL(url);
+
+                // 可选：移除<a>元素（虽然它已经是隐藏的）
+                document.body.removeChild(a);
+              })
+              .catch(function (error) {
+                console.error("Error generating Excel file:", error);
+              });
+          });
+      });
+    </script>
+  </body>
+</html>
