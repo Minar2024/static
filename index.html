@@ -42,7 +42,6 @@
         const saveAllDataBtn = document.getElementById("saveAllDataBtn");
         const getAllDataBtn = document.getElementById("getAllDataBtn");
 
-        let tableCount = 0;
         // Function to load tables from localStorage
         function loadTablesFromStorage() {
           const savedTables = JSON.parse(localStorage.getItem("tables")) || [];
@@ -50,14 +49,15 @@
         }
 
         // Function to create a new table from saved data
-        function createNewTableFromData({ date, timePeriods }) {
-          tableCount++;
+        function createNewTableFromData({ id, date, timePeriods }) {
           const newTableContainer = document.createElement("div");
           newTableContainer.className = "table-container";
+          newTableContainer.id = id || new Date().getTime();
+          const initDate =
+            date || new Date().toLocaleDateString().replace(/\//g, "-");
+          const initTimePeriods = timePeriods || [];
 
           const newTable = document.createElement("table");
-          newTable.id = `myTable${tableCount}`;
-
           const thead = document.createElement("thead");
           const headerRow = document.createElement("tr");
           headerRow.innerHTML = `
@@ -69,7 +69,7 @@
           newTable.appendChild(thead);
 
           const tbody = document.createElement("tbody");
-          timePeriods.forEach((row) => {
+          initTimePeriods.forEach((row) => {
             const newRow = tbody.insertRow();
             newRow.insertCell(
               0
@@ -88,21 +88,38 @@
           });
           newTable.appendChild(tbody);
 
+          // 增加时间段
           const addRowBtn = document.createElement("button");
-          addRowBtn.innerHTML = "Add Row";
+          addRowBtn.innerHTML = "增加时间段";
           addRowBtn.onclick = function () {
-            addRowAndUpdateStorage(newTable.id);
+            addRowAndUpdateStorage(newTableContainer.id);
           };
-
           newTableContainer.appendChild(addRowBtn);
 
+          // 删除表格
+          const deleteTableBtn = document.createElement("button");
+          deleteTableBtn.innerHTML = "删除表格";
+          deleteTableBtn.onclick = function () {
+            const userConfirmed = confirm("你确定删除这个表格吗？");
+            if (userConfirmed) {
+              // 用户点击了“确定”按钮
+              deleteTableAndUpdateStorage(newTableContainer.id);
+              // 在这里添加删除文件的代码，比如发送 AJAX 请求到服务器
+            } else {
+              // 用户点击了“取消”按钮或关闭了弹窗
+              console.log("表格删除已取消");
+            }
+          };
+          newTableContainer.appendChild(deleteTableBtn);
+
+          // 增加日期选择器
           // 创建一个新的 input 元素
           const dateInput = document.createElement("input");
           dateInput.style.marginLeft = "50px";
           // 设置 input 元素的 type 属性为 'time'
           dateInput.type = "date";
           // 设置 input 元素的 value 属性为当前日期
-          dateInput.value = date;
+          dateInput.value = initDate;
           // 将 input 元素添加到表格容器中
           dateInput.className = "workDay";
           newTableContainer.appendChild(dateInput);
@@ -111,9 +128,14 @@
           tableWrapper.appendChild(newTableContainer);
         }
 
+        function deleteTableAndUpdateStorage(containerId) {
+          const container = document.getElementById(containerId);
+          container.parentNode.removeChild(container);
+          updateStorage();
+        }
         // Function to add a new row to the current table and update localStorage
-        function addRowAndUpdateStorage(tableId) {
-          addRowToTable(tableId);
+        function addRowAndUpdateStorage(containerId) {
+          addRowToTable(containerId);
           updateStorage();
         }
 
@@ -132,18 +154,21 @@
           const tableContainers =
             tableWrapper.getElementsByClassName("table-container");
           for (let i = 0; i < tableContainers.length; i++) {
-            const table = tableContainers[i].querySelector("table tbody");
+            const tbody = tableContainers[i].querySelector("table tbody");
             const workDay = tableContainers[i].querySelector(".workDay");
-            console.log("workDay", workDay.value);
             const rowsData = [];
-            for (let j = 0; j < table.rows.length; j++) {
-              const cells = table.rows[j].cells;
+            for (let j = 0; j < tbody.rows.length; j++) {
+              const cells = tbody.rows[j].cells;
               rowsData.push([
                 cells[0].querySelector("input").value,
                 cells[1].querySelector("input").value,
               ]);
             }
-            tablesData.push({ date: workDay.value, timePeriods: rowsData });
+            tablesData.push({
+              id: tableContainers[i].id,
+              date: workDay.value,
+              timePeriods: rowsData,
+            });
           }
           localStorage.setItem("tables", JSON.stringify(tablesData));
           return tablesData;
@@ -155,11 +180,11 @@
           console.log(allData);
         };
         // Function to add a new row to the current table
-        function addRowToTable(tableId) {
-          const table = document
-            .getElementById(tableId)
-            .getElementsByTagName("tbody")[0];
-          const newRow = table.insertRow();
+        function addRowToTable(containerId) {
+          const tbody = document
+            .getElementById(containerId)
+            .querySelector("table tbody");
+          const newRow = tbody.insertRow();
 
           const cell1 = newRow.insertCell(0);
           const cell2 = newRow.insertCell(1);
@@ -171,14 +196,13 @@
           const deleteBtn = document.createElement("button");
           deleteBtn.innerHTML = "删除";
           deleteBtn.onclick = function () {
-            table.deleteRow(newRow.rowIndex - 1); // Adjust rowIndex because the row has already been added
+            tbody.deleteRow(newRow.rowIndex - 1); // Adjust rowIndex because the row has already been added
           };
           actionsCell.appendChild(deleteBtn);
         }
 
         // Attach the createNewTable function to the Add New Table button
-        addTableBtn.onclick = () =>
-          createNewTableFromData({ date: "", timePeriods: [] });
+        addTableBtn.onclick = () => createNewTableFromData({});
 
         // Load tables from localStorage on page load
         loadTablesFromStorage();
@@ -345,7 +369,6 @@
                     合价: timePeriod.totalPay,
                     空白格: "",
                   };
-                  console.log(JSON.stringify(row, null, 2));
                   worksheet.addRow(row);
                 });
                 // worksheet.lastRow.style = {
@@ -358,7 +381,6 @@
                 // };
               });
             });
-            console.log(worksheet);
 
             // 遍历工作表中的所有行（包括空行）
             worksheet.eachRow(
@@ -416,14 +438,6 @@
                   (_, i) => i + startRow
                 );
                 for (let col of mergeCellsColRange) {
-                  console.log(
-                    col +
-                      mergeCellsRowRange[0] +
-                      ":" +
-                      col +
-                      mergeCellsRowRange[1]
-                  );
-
                   // 针对特定的区域进行简单求和计算
                   if (["I"].includes(col)) {
                     // for (let row of rowRangeArray) {
